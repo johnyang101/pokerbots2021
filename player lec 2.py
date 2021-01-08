@@ -27,24 +27,6 @@ class Player(Bot):
         '''
         self.board_allocations = [[],[],[]] #keep track of allocation of hole cards at round start
         self.hole_strengths = [0, 0, 0]
-        self.MONTE_CARLO_ITERS = 100
-
-    def rank_to_numeric(self, rank):
-        if rank.isnumeric(): #2-9
-            return int(rank)
-        elif rank == 'T':
-            return 10
-        elif rank == 'J':
-            return 11
-        elif rank == 'Q':
-            return 12
-        elif rank == 'K':
-            return 13
-        elif rank == 'A':
-            return 14
-    
-    def sort_cards_by_rank(self, cards):
-        return sorted(cards, reverse=True, key=lambda x: self.rank_to_numeric(x[0])) #x[0] represents rank
 
     def allocate_cards(self, my_cards):
         ranks = {}
@@ -75,89 +57,16 @@ class Player(Bot):
                 pairs.append(cards[1])
                 singles.append(cards[2])
         
-        cards_remaining = set(my_cards)
-        allocated_cards = set() #cards committed
-        holes_allocated = [] #holes made already
+        if len(pairs) > 0:
+            self.strong_hole = True
 
-        _MIN_PAIR_VALUE = 5 #we only want pairs stronger than this value
+        allocation = pairs + singles
 
-        for i in range(len(pairs)//2):
-            pair = [pairs[2*i], pairs[2*i+1]] #get pair
-            pair_rank = pair[0][0]
+        for i in range(NUM_BOARDS):
 
-            if self.rank_to_numeric(pair_rank) >= _MIN_PAIR_VALUE:
-                holes_allocated.append(pair)
-                allocated_cards.update(pair)
+            cards = [allocation[2*i], allocation[2*i + 1]]
             
-        cards_remaining = cards_remaining - allocated_cards #update what cards we have remaining
-
-        sorted_remaining = self.sort_cards_by_rank(list(cards_remaining))
-
-        for i in range(len(sorted_remaining) - 1):
-            card_1 = sorted_remaining[i]
-            card_2 = sorted_remaining[i + 1]
-
-            rank_diff = self.rank_to_numeric(card_1[0]) - self.rank_to_numeric(card_2[0])
-
-            if (rank_diff <= 1) and (card_1 not in allocated_cards) and (card_2 not in allocated_cards):
-                hole = [card_1, card_2]
-                holes_allocated.append(hole)
-                allocated_cards.update(hole)
-            
-        cards_remaining = cards_remaining - allocated_cards
-
-        suits = {} #dictionary that maps suits to cards remaining
-        for card in cards_remaining:
-            card_suit = card[1]
-
-            if card_suit in suits:
-                suits[card_suit].append(card)
-            else:
-                suits[card_suit] = [card]
-                
-        for suit in suits:
-            cards = suits[suit]
-
-            if len(cards) == 2 or len(cards) == 3:
-                hole = [cards[0], cards[1]]
-                holes_allocated.append(hole)
-                allocated_cards.update(hole)
-            
-            elif len(cards) == 4: 
-                hole_1 = [cards[0], cards[1]]
-                hole_2 = [cards[2], cards[3]]
-
-                holes_allocated.append(hole_1)
-                allocated_cards.update(hole_1)
-
-                holes_allocated.append(hole_2)
-                allocated_cards.update(hole_2)
-    
-        cards_remaining = cards_remaining - allocated_cards
-        extra_cards = list(cards_remaining)
-
-        for i in range(len(extra_cards) // 2):
-            hole = [extra_cards[2*i], extra_cards[2*i +1]]
-            holes_allocated.append(hole)
-            allocated_cards.update(hole)
-
-        cards_remaining = cards_remaining - allocated_cards
-
-        assert len(holes_allocated) == 3, 'allocated more/less than 3 holes'
-        assert len(cards_remaining) == 0, 'we didnt allocate enough'
-
-        return holes_allocated
-
-        # if len(pairs) > 0:
-        #     self.strong_hole = True
-
-        # allocation = pairs + singles
-
-        # for i in range(NUM_BOARDS):
-
-        #     cards = [allocation[2*i], allocation[2*i + 1]]
-            
-        #     self.board_allocations[i] = cards
+            self.board_allocations[i] = cards
         
 
     def calculate_strength(self, hole, iters):
@@ -200,30 +109,6 @@ class Player(Bot):
 
         return hand_strength
 
-    def assign_holes(self, hole_cards):
-        holes_and_strengths = []
-
-        for hole in hole_cards:
-            strength = self.calculate_strength(hole, self.MONTE_CARLO_ITERS)
-            holes_and_strengths.append((hole, strength))
-
-        hole_and_strengths = sorted(holes_and_strengths, key = lambda x: x[1])
-
-        if random.random() < 0.15: #swap strongest hole card with second
-            temp = hole_and_strengths[2]
-            hole_and_strengths[2] = hole_and_strengths[1]
-            hole_and_strengths[1] = temp
-
-        if random.random() < 0.15: #swap second w last
-            temp = hole_and_strengths[1]
-            hole_and_strengths[1] = hole_and_strengths[0]
-            hole_and_strengths[0] = temp
-        
-        for i in range(NUM_BOARDS):
-            self.board_allocations[i] = hole_and_strengths[i][0]
-            self.hole_strengths[i] = hole_and_strengths[i][1]
-            
-
 
 
     def handle_new_round(self, game_state, round_state, active):
@@ -245,17 +130,14 @@ class Player(Bot):
         my_cards = round_state.hands[active]  # your six cards at teh start of the round
         big_blind = bool(active)  # True if you are the big blind
         
-        allocated_holes = self.allocate_cards(my_cards)
-        self.assign_holes(allocated_holes)
+        _MONTE_CARLO_ITERS = 100
         
+        self.allocate_cards(my_cards)
 
-        # lec 2 strat
-        # self.allocate_cards(my_cards)
-
-        # for i in range(NUM_BOARDS):
-        #     hole = self.board_allocations[i]
-        #     strength = self.calculate_strength(hole, self._MONTE_CARLO_ITERS)
-        #     self.hole_strengths[i] = strength
+        for i in range(NUM_BOARDS):
+            hole = self.board_allocations[i]
+            strength = self.calculate_strength(hole, _MONTE_CARLO_ITERS)
+            self.hole_strengths[i] = strength
 
     def handle_round_over(self, game_state, terminal_state, active):
         '''
