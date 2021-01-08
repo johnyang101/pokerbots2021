@@ -10,11 +10,12 @@ from skeleton.runner import parse_args, run_bot
 import eval7
 import random
 
+
+
 class Player(Bot):
     '''
     A pokerbot.
     '''
-
     def __init__(self):
         '''
         Called when a new game starts. Called exactly once.
@@ -28,7 +29,11 @@ class Player(Bot):
         self.board_allocations = [[],[],[]] #keep track of allocation of hole cards at round start
         self.hole_strengths = [0, 0, 0]
         self.MONTE_CARLO_ITERS = 100
-
+        self.ordering_strength = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        self.ordering_number = [0, 0, 0, 0, 0, 0]
+        self.epsilon = .7
+        self.gamma = .98
+        self.current_ordering = 0
     def rank_to_numeric(self, rank):
         if rank.isnumeric(): #2-9
             return int(rank)
@@ -208,21 +213,65 @@ class Player(Bot):
             holes_and_strengths.append((hole, strength))
 
         hole_and_strengths = sorted(holes_and_strengths, key = lambda x: x[1])
-
-        if random.random() < 0.15: #swap strongest hole card with second
+        rand=1
+        opt_index=-1
+        if random.random()>self.epsilon:
+            max_strength=-1
+            for k in range (6):
+                if self.ordering_strength[k]>max_strength:
+                    max_strength=self.ordering_strength[k]
+                    opt_index=k
+        else:
+            rand=random.random()
+        if rand<.16666 or opt_index==0:
+            self.current_ordering=0
+        elif rand<.33333 or opt_index==1:
+            self.current_ordering=1
             temp = hole_and_strengths[2]
             hole_and_strengths[2] = hole_and_strengths[1]
             hole_and_strengths[1] = temp
-
-        if random.random() < 0.15: #swap second w last
+        elif rand<.5 or opt_index==2:
+            self.current_ordering=2
             temp = hole_and_strengths[1]
             hole_and_strengths[1] = hole_and_strengths[0]
             hole_and_strengths[0] = temp
+        elif rand<.6666 or opt_index==3:
+            self.current_ordering=3
+            temp = hole_and_strengths[2]
+            hole_and_strengths[2] = hole_and_strengths[1]
+            hole_and_strengths[1] = temp
+            temp = hole_and_strengths[2]
+            hole_and_strengths[2] = hole_and_strengths[0]
+            hole_and_strengths[0] = temp
+        elif rand<.6666 or opt_index==4:
+            self.current_ordering=3
+            temp = hole_and_strengths[2]
+            hole_and_strengths[2] = hole_and_strengths[1]
+            hole_and_strengths[1] = temp
+            temp = hole_and_strengths[1]
+            hole_and_strengths[1] = hole_and_strengths[0]
+            hole_and_strengths[0] = temp
+        else:
+            self.current_ordering=5
+            temp = hole_and_strengths[2]
+            hole_and_strengths[2] = hole_and_strengths[0]
+            hole_and_strengths[0] = temp
+        self.ordering_number[self.current_ordering] += 1
+        self.epsilon*=self.gamma
+        #if random.random() < 0.15: #swap strongest hole card with second
+        #    temp = hole_and_strengths[2]
+        #    hole_and_strengths[2] = hole_and_strengths[1]
+        #    hole_and_strengths[1] = temp
+
+        #if random.random() < 0.15: #swap second w last
+        #    temp = hole_and_strengths[1]
+        #    hole_and_strengths[1] = hole_and_strengths[0]
+        #    hole_and_strengths[0] = temp
         
         for i in range(NUM_BOARDS):
             self.board_allocations[i] = hole_and_strengths[i][0]
             self.hole_strengths[i] = hole_and_strengths[i][1]
-            
+
 
 
 
@@ -277,7 +326,14 @@ class Player(Bot):
             previous_board_state = terminal_board_state.previous_state
             my_cards = previous_board_state.hands[active]  # your cards
             opp_cards = previous_board_state.hands[1-active]  # opponent's cards or [] if not revealed
-        
+
+        round_result=0
+        if my_delta>0:
+            round_result=1
+        elif my_delta<0:
+            round_result=-1
+        self.ordering_strength[self.current_ordering]=(self.ordering_strength[self.current_ordering]*(self.ordering_number[self.current_ordering]-1)+round_result)/self.ordering_number[self.current_ordering]
+
         self.board_allocations = [[],[],[]]
         self.hole_strengths = [0, 0, 0]
 
