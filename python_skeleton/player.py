@@ -36,7 +36,7 @@ class Player(Bot):
         self.current_ordering = 0
 
         self.aggressiveness_lp = random.random()
-        self.initial_hole_lp = 1
+        self.initial_hole_lp = 0.1
         self.decay_factor_lp = 1
         self.intimidated_threshold_lp = 5
         self.intimidation_factor_lp = 0.15
@@ -315,29 +315,29 @@ class Player(Bot):
         #     strength = self.calculate_strength(hole, self._MONTE_CARLO_ITERS)
         #     self.hole_strengths[i] = strength
     
-    def update_lps(self, result, my_delta, initial_hole_lp, decay_factor_lp, intimidated_threshold_lp, intimidation_factor_lp, overstrength_threshold_lp, aggressiveness_lp):
+    def update_lps(self, result, my_delta):
         if result == 1.0: #win
-            initial_hole_lp *= 1.01 + (my_delta * 0.001)
-            decay_factor_lp += 0.01 
+            self.initial_hole_lp * 1.01 + (my_delta * 0.001)
+            self.decay_factor_lp += 0.05
             #logic underneath is that if we won a lot more, we can afford to play more ballsy.
-            intimidated_threshold_lp *= 0.99 - (my_delta * 0.001)
-            intimidation_factor_lp *= 0.99 - (my_delta * 0.001)
-            overstrength_threshold_lp *= 0.99 - (my_delta * 0.001)
-            aggressiveness_lp *= 0.95 - (my_delta * 0.001)
+            self.intimidated_threshold_lp *= 0.99 - (my_delta * 0.001)
+            self.intimidation_factor_lp *= 0.99 - (my_delta * 0.001)
+            self.overstrength_threshold_lp *= 0.99 - (my_delta * 0.001)
+            self.aggressiveness_lp *= 0.95 - (my_delta * 0.001)
         elif result == -1.0: #loss
             assert result == -1.0, 'Result not -1 for loss'
             my_delta = abs(my_delta)
 
-            initial_hole_lp *= 0.99 - (my_delta * 0.001)
-            decay_factor_lp += 0.01 
+            self.initial_hole_lp *= 0.99 - (my_delta * 0.001)
+            self.decay_factor_lp += 0.05 
 
             #if we lost a lot more, we should play more conservatively.
-            intimidated_threshold_lp *= 1.01 + (my_delta * 0.001)
-            intimidation_factor_lp *= 1.01 + (my_delta * 0.001)
-            overstrength_threshold_lp *= 1.01 + (my_delta * 0.001)
-            aggressiveness_lp *= 1.05 + (my_delta * 0.001)
+            self.intimidated_threshold_lp * 1.01 + (my_delta * 0.001)
+            self.intimidation_factor_lp *= 1.01 + (my_delta * 0.001)
+            self.overstrength_threshold_lp *= 1.01 + (my_delta * 0.001)
+            self.aggressiveness_lp *= 1.05 + (my_delta * 0.001)
 
-        return initial_hole_lp, decay_factor_lp, intimidated_threshold_lp, intimidation_factor_lp, overstrength_threshold_lp, aggressiveness_lp
+        return
         
 
     def handle_round_over(self, game_state, terminal_state, active):
@@ -366,7 +366,7 @@ class Player(Bot):
         
         self.ordering_strength[self.current_ordering]=(self.ordering_strength[self.current_ordering]*(self.ordering_number[self.current_ordering]-1)+round_result)/self.ordering_number[self.current_ordering]
         
-        self.initial_hole_lp, self.decay_factor_lp, self.intimidated_threshold_lp, self.intimidation_factor_lp, self.overstrength_threshold_lp, self.aggressiveness_lp = self.update_lps(round_result, my_delta, self.initial_hole_lp, self.decay_factor_lp, self.intimidated_threshold_lp, self.intimidation_factor_lp, self.overstrength_threshold_lp, self.aggressiveness_lp)
+        self.update_lps(round_result, my_delta)
 
         self.board_allocations = [[],[],[]]
         self.hole_strengths = [0, 0, 0]
@@ -435,10 +435,10 @@ class Player(Bot):
                     # initial_hole_lp = 1 #initial learning parameter
                     # decay_factor_lp = 1 #arbitarily increases by 0.1 lets say for each round. in the denominator of random_factor
                     random_factor = random.random()
-                    doggo = round(my_pips[i] + board_cont_cost + strength * self.initial_hole_lp * (pot_total + board_cont_cost) + min(12, round((random_factor * (i + 1))/self.decay_factor_lp)))
+                    doggo = round(my_pips[i] + board_cont_cost + (strength + self.initial_hole_lp) * (pot_total + board_cont_cost) + min(12, round((random_factor * (i + 1))/self.decay_factor_lp)))
                     print(doggo)
                     print('initial hole lp ' + str(self.initial_hole_lp)) 
-                    raise_amount = int(round(my_pips[i] + board_cont_cost + strength * self.initial_hole_lp * (pot_total + board_cont_cost) + round((random_factor * (i + 1))/self.decay_factor_lp))) #randomness factor depending on randomness, size of board, and decay
+                    raise_amount = int(round(my_pips[i] + board_cont_cost + (strength + self.initial_hole_lp) * (pot_total + board_cont_cost) + min(12, round((random_factor * (i + 1))/self.decay_factor_lp)))) #randomness factor depending on randomness, size of board, and decay
 
                 else: #not pre-flop
                     # need to code smth to figure out strength given hole AND community cards.
@@ -448,11 +448,10 @@ class Player(Bot):
                     # initial_hole_lp = 1 #initial learning parameter
                     # decay_factor_lp = 1 #arbitarily increases by 0.1 lets say for each round. in the denominator of random_factor
                     random_factor = random.random()
-                    doggo = round(my_pips[i] + board_cont_cost + strength * self.initial_hole_lp * (pot_total + board_cont_cost) + min(12, round((random_factor * (i + 1))/self.decay_factor_lp)))
+                    doggo = round(my_pips[i] + board_cont_cost + (strength + self.initial_hole_lp) * (pot_total + board_cont_cost) + min(12, round((random_factor * (i + 1))/self.decay_factor_lp)))
                     print(doggo)
                     print('initial hole lp ' + str(self.initial_hole_lp)) 
-
-                    raise_amount = int(round(my_pips[i] + board_cont_cost + strength * self.initial_hole_lp * (pot_total + board_cont_cost) + round((random_factor * (i + 1))/self.decay_factor_lp))) #randomness factor depending on randomness, size of board, and decay
+                    raise_amount = int(round(my_pips[i] + board_cont_cost + (strength + self.initial_hole_lp) * (pot_total + board_cont_cost) + min(12, round((random_factor * (i + 1))/self.decay_factor_lp)))) #randomness factor depending on randomness, size of board, and decay
 
                 
                 #makes sure raise amount in bounds
