@@ -32,8 +32,24 @@ class Player(Bot):
         self.ordering_strength = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         self.ordering_number = [0, 0, 0, 0, 0, 0]
         self.epsilon = .7
-        self.gamma = .98
+        self.gamma = .99
         self.current_ordering = 0
+
+        self.aggressiveness_lp = random.random()
+        self.initial_hole_lp = 0.0
+        self.decay_factor_lp = 1.0
+        self.intimidated_threshold_lp = .75
+        self.intimidation_factor_lp = 0.075
+        self.overstrength_threshold_lp = 0.05
+        self.optimal_lps=[0.5,0.0,1.0,0.75,0.075,0.05]
+        self.my_delta_sum=[0.0,0.0,0.0,0.0,0.0,0.0]
+        self.weighted_lps_sum=[0.0,0.0,0.0,0.0,0.0,0.0]
+        self.lp_ranges=[1.0,.6,1.0,.5,.15,.1]
+        self.epsilon_lp=[.9,.9,.9,.9,.9,.9]
+        self.gamma_lp=.985
+        self.flag_aggressive=False
+        self.flag_overstrength=False
+        self.flag_intimidation=False
     def rank_to_numeric(self, rank):
         if rank.isnumeric(): #2-9
             return int(rank)
@@ -47,7 +63,7 @@ class Player(Bot):
             return 13
         elif rank == 'A':
             return 14
-    
+
     def sort_cards_by_rank(self, cards):
         return sorted(cards, reverse=True, key=lambda x: self.rank_to_numeric(x[0])) #x[0] represents rank
 
@@ -62,7 +78,7 @@ class Player(Bot):
                 ranks[card_rank].append(card)
             else:
                 ranks[card_rank] = [card]
-            
+
         pairs = []
         singles = []
 
@@ -71,15 +87,15 @@ class Player(Bot):
 
             if len(cards) == 1: #only single
                 singles.append(cards[0])
-            
+
             elif len(cards) == 2 or len(cards) == 4: # pairs or 4 of a kind
                 pairs += cards
-            
+
             else: #len(cards) == 3
                 pairs.append(cards[0])
                 pairs.append(cards[1])
                 singles.append(cards[2])
-        
+
         cards_remaining = set(my_cards)
         allocated_cards = set() #cards committed
         holes_allocated = [] #holes made already
@@ -93,7 +109,7 @@ class Player(Bot):
             if self.rank_to_numeric(pair_rank) >= _MIN_PAIR_VALUE:
                 holes_allocated.append(pair)
                 allocated_cards.update(pair)
-            
+
         cards_remaining = cards_remaining - allocated_cards #update what cards we have remaining
 
         sorted_remaining = self.sort_cards_by_rank(list(cards_remaining))
@@ -108,7 +124,7 @@ class Player(Bot):
                 hole = [card_1, card_2]
                 holes_allocated.append(hole)
                 allocated_cards.update(hole)
-            
+
         cards_remaining = cards_remaining - allocated_cards
 
         suits = {} #dictionary that maps suits to cards remaining
@@ -119,7 +135,7 @@ class Player(Bot):
                 suits[card_suit].append(card)
             else:
                 suits[card_suit] = [card]
-                
+
         for suit in suits:
             cards = suits[suit]
 
@@ -127,8 +143,8 @@ class Player(Bot):
                 hole = [cards[0], cards[1]]
                 holes_allocated.append(hole)
                 allocated_cards.update(hole)
-            
-            elif len(cards) == 4: 
+
+            elif len(cards) == 4:
                 hole_1 = [cards[0], cards[1]]
                 hole_2 = [cards[2], cards[3]]
 
@@ -137,7 +153,7 @@ class Player(Bot):
 
                 holes_allocated.append(hole_2)
                 allocated_cards.update(hole_2)
-    
+
         cards_remaining = cards_remaining - allocated_cards
         extra_cards = list(cards_remaining)
 
@@ -161,18 +177,18 @@ class Player(Bot):
         # for i in range(NUM_BOARDS):
 
         #     cards = [allocation[2*i], allocation[2*i + 1]]
-            
+
         #     self.board_allocations[i] = cards
-        
+
 
     def calculate_strength(self, hole, iters):
-        
+
         deck = eval7.Deck()
         hole_cards = [eval7.Card(card) for card in hole]
 
         for card in hole_cards:
             deck.cards.remove(card)
-        
+
         score = 0
 
         for _ in range(iters):
@@ -194,13 +210,13 @@ class Player(Bot):
 
             if our_hand_value > opp_hand_value: #we win
                 score += 2
-            
+
             elif our_hand_value == opp_hand_value: #we tie
                 score += 1
-            
+
             else: #we lost
                 score += 0
-        
+
         hand_strength = score / (2 * iters)
 
         return hand_strength
@@ -213,7 +229,7 @@ class Player(Bot):
             holes_and_strengths.append((hole, strength))
 
         hole_and_strengths = sorted(holes_and_strengths, key = lambda x: x[1])
-        rand=1.0
+        rand=1
         opt_index=-1
         if random.random()>self.epsilon:
             max_strength=-1
@@ -267,7 +283,7 @@ class Player(Bot):
         #    temp = hole_and_strengths[1]
         #    hole_and_strengths[1] = hole_and_strengths[0]
         #    hole_and_strengths[0] = temp
-        
+
         for i in range(NUM_BOARDS):
             self.board_allocations[i] = hole_and_strengths[i][0]
             self.hole_strengths[i] = hole_and_strengths[i][1]
@@ -293,10 +309,10 @@ class Player(Bot):
         round_num = game_state.round_num  # the round number from 1 to NUM_ROUNDS
         my_cards = round_state.hands[active]  # your six cards at teh start of the round
         big_blind = bool(active)  # True if you are the big blind
-        
+
         allocated_holes = self.allocate_cards(my_cards)
         self.assign_holes(allocated_holes)
-        
+
 
         # lec 2 strat
         # self.allocate_cards(my_cards)
@@ -305,6 +321,84 @@ class Player(Bot):
         #     hole = self.board_allocations[i]
         #     strength = self.calculate_strength(hole, self._MONTE_CARLO_ITERS)
         #     self.hole_strengths[i] = strength
+
+    def choosing_lps(self):
+        self.aggressiveness_lp=self.optimal_lps[0]
+        self.initial_hole_lp=self.optimal_lps[1]
+        self.decay_factor_lp+=.1
+        self.intimidated_threshold_lp=self.optimal_lps[3]
+        self.intimidation_factor_lp=self.optimal_lps[4]
+        self.overstrength_threshold_lp=self.optimal_lps[5]
+
+        if random.random()<self.epsilon_lp[0]:
+            self.aggressiveness_lp=random.random()*self.lp_ranges[0]
+        if random.random()<self.epsilon_lp[1]:
+            self.initial_hole_lp=random.random()*self.lp_ranges[1]-.3
+        if random.random() < self.epsilon_lp[3]:
+            self.intimidated_threshold_lp = random.random() * self.lp_ranges[3]+.5
+        if random.random() < self.epsilon_lp[4]:
+            self.intimidation_factor_lp = random.random() * self.lp_ranges[4]
+        if random.random() < self.epsilon_lp[5]:
+            self.overstrength_threshold_lp = random.random() * self.lp_ranges[5]
+
+    def update_optimal_lps(self, my_delta):
+        bound_lp=40.0
+        if my_delta>0:
+            my_delta=min(my_delta,bound_lp)
+
+            if self.flag_aggressive:
+                self.weighted_lps_sum[0]+=self.aggressiveness_lp*my_delta
+                self.my_delta_sum[0] += my_delta
+                self.epsilon_lp[0] *= self.gamma_lp
+
+            self.weighted_lps_sum[1] += self.initial_hole_lp*my_delta
+            self.my_delta_sum[1] += my_delta
+            self.epsilon_lp[1] *= self.gamma_lp
+
+            if self.flag_intimidation:
+                self.weighted_lps_sum[3] += self.intimidated_threshold_lp*my_delta
+                self.weighted_lps_sum[4] += self.intimidation_factor_lp*my_delta
+                self.my_delta_sum[3] += my_delta
+                self.my_delta_sum[4] += my_delta
+                self.epsilon_lp[3] *= self.gamma_lp
+                self.epsilon_lp[4] *= self.gamma_lp
+
+            if self.flag_overstrength:
+               self.weighted_lps_sum[5] += self.overstrength_threshold_lp*my_delta
+               self.my_delta_sum[5] += my_delta
+               self.epsilon_lp[5] *= self.gamma_lp
+
+            self.flag_intimidation=False
+            self.flag_overstrength=False
+            self.flag_aggressive=False
+
+            for j in range(6):
+                self.optimal_lps[j]=self.weighted_lps_sum[j]/self.my_delta_sum[j]
+
+
+
+      #  if result == 1.0: #win
+       #     self.initial_hole_lp * 1.01 + (my_delta * 0.001)
+        #    self.decay_factor_lp += 0.05
+         #   #logic underneath is that if we won a lot more, we can afford to play more ballsy.
+       #     self.intimidated_threshold_lp *= 0.99 - (my_delta * 0.001)
+        #    self.intimidation_factor_lp *= 0.99 - (my_delta * 0.001)
+         #   self.overstrength_threshold_lp *= 0.99 - (my_delta * 0.001)
+         #   self.aggressiveness_lp *= 0.95 - (my_delta * 0.001)
+       # elif result == -1.0: #loss
+        #    assert result == -1.0, 'Result not -1 for loss'
+        #    my_delta = abs(my_delta)
+        #   self.initial_hole_lp *= 0.99 - (my_delta * 0.001)
+        #    self.decay_factor_lp += 0.05
+
+            #if we lost a lot more, we should play more conservatively.
+        #   self.intimidated_threshold_lp * 1.01 + (my_delta * 0.001)
+        #   self.intimidation_factor_lp *= 1.01 + (my_delta * 0.001)
+        #    self.overstrength_threshold_lp *= 1.01 + (my_delta * 0.001)
+        #    self.aggressiveness_lp *= 1.05 + (my_delta * 0.001)
+
+        return
+
 
     def handle_round_over(self, game_state, terminal_state, active):
         '''
@@ -319,16 +413,20 @@ class Player(Bot):
         Nothing.
         '''
         my_delta = terminal_state.deltas[active]  # your bankroll change from this round
-        opp_delta = terminal_state.deltas[1-active] # your opponent's bankroll change from this round 
+        opp_delta = terminal_state.deltas[1-active] # your opponent's bankroll change from this round
         previous_state = terminal_state.previous_state  # RoundState before payoffs
         street = previous_state.street  # 0, 3, 4, or 5 representing when this round ended
         for terminal_board_state in previous_state.board_states:
             previous_board_state = terminal_board_state.previous_state
             my_cards = previous_board_state.hands[active]  # your cards
             opp_cards = previous_board_state.hands[1-active]  # opponent's cards or [] if not revealed
-        bound=1
+
+        bound=1.0
         round_result=min(max(my_delta,-bound),bound)
+
         self.ordering_strength[self.current_ordering]=(self.ordering_strength[self.current_ordering]*(self.ordering_number[self.current_ordering]-1)+round_result)/self.ordering_number[self.current_ordering]
+
+        self.update_lps(my_delta)
 
         self.board_allocations = [[],[],[]]
         self.hole_strengths = [0, 0, 0]
@@ -338,6 +436,7 @@ class Player(Bot):
 
         if round_num == NUM_ROUNDS:
             print(game_clock)
+
 
 
     def get_actions(self, game_state, round_state, active):
@@ -367,26 +466,55 @@ class Player(Bot):
         net_cost = 0 # keep track of the net additional amount you are spending across boards this round
         my_actions = [None] * NUM_BOARDS
         for i in range(NUM_BOARDS):
-            if AssignAction in legal_actions[i]:
+            if AssignAction in legal_actions[i]: #allocate cards
                 cards = [my_cards[2*i], my_cards[2*i+1]]
                 my_actions[i] = AssignAction(cards)
 
-            elif isinstance(round_state.board_states[i], TerminalState):
+            elif isinstance(round_state.board_states[i], TerminalState): #round over so check?
                 my_actions[i] = CheckAction()
 
             else: #do we add more resources
                 board_cont_cost = continue_cost[i] #continue cost is a list
                 board_total = round_state.board_states[i].pot #pot before round starts
                 pot_total = my_pips[i] + opp_pips[i] + board_total
-                
+
                 min_raise, max_raise = round_state.board_states[i].raise_bounds(active, round_state.stacks) #active variable is which player we are
                 strength = self.hole_strengths[i]
 
                 if street < 3: #means pre-flop
-                    raise_amount = int(my_pips[i] + board_cont_cost + 0.4 * (pot_total + board_cont_cost)) #0.4 is a parameter to tweak
-                else:
-                    raise_amount = int(my_pips[i] + board_cont_cost + 0.75 * (pot_total + board_cont_cost))
-                
+                    if my_pips[i] == 1:
+                        BIG_BLIND = False
+                    elif my_pips[i] == 2 and opp_pips[i] == 1:
+                        BIG_BLIND = True
+
+                    '''
+                    Initial raise amount should depend on strength of hole, an arbitrary learning parameter, and a randomness factor that decays over time.
+
+                    My implementation does this; however, may not be ideal.
+                    '''
+
+                    # initial_hole_lp = 1 #initial learning parameter
+                    # decay_factor_lp = 1 #arbitarily increases by 0.1 lets say for each round. in the denominator of random_factor
+                    random_factor = random.random()
+                    doggo = round(my_pips[i] + board_cont_cost + (strength + self.initial_hole_lp) * (pot_total + board_cont_cost) + min(12, round((random_factor * (i + 1))/self.decay_factor_lp)))
+                    print(doggo)
+                    print('initial hole lp ' + str(self.initial_hole_lp))
+                    raise_amount = int(round(my_pips[i] + board_cont_cost + (strength + self.initial_hole_lp) * (pot_total + board_cont_cost) + min(12, round((random_factor * (i + 1))/self.decay_factor_lp)))) #randomness factor depending on randomness, size of board, and decay
+
+                else: #not pre-flop
+                    # need to code smth to figure out strength given hole AND community cards.
+                    # rn just using hole strength
+
+
+                    # initial_hole_lp = 1 #initial learning parameter
+                    # decay_factor_lp = 1 #arbitarily increases by 0.1 lets say for each round. in the denominator of random_factor
+                    random_factor = random.random()
+                    doggo = round(my_pips[i] + board_cont_cost + (strength + self.initial_hole_lp) * (pot_total + board_cont_cost) + min(12, round((random_factor * (i + 1))/self.decay_factor_lp)))
+                    print(doggo)
+                    print('initial hole lp ' + str(self.initial_hole_lp))
+                    raise_amount = int(round(my_pips[i] + board_cont_cost + (strength + self.initial_hole_lp) * (pot_total + board_cont_cost) + min(12, round((random_factor * (i + 1))/self.decay_factor_lp)))) #randomness factor depending on randomness, size of board, and decay
+
+
                 #makes sure raise amount in bounds
                 raise_amount = max([min_raise, raise_amount])
                 raise_amount = min([max_raise, raise_amount])
@@ -394,72 +522,66 @@ class Player(Bot):
                 raise_cost = raise_amount - my_pips[i]
 
                 #need to be allowed to raise and afford it
-                if RaiseAction in legal_actions[i] and (raise_cost <= my_stack - net_cost):
+                if RaiseAction in legal_actions[i]:
                     commit_action = RaiseAction(raise_amount)
-                    commit_cost = raise_cost
-                
+                    if (raise_cost <= my_stack - net_cost):
+                        commit_cost = raise_cost
+                    else:
+                        commit_cost = my_stack - net_cost
+
                 elif CallAction in legal_actions[i]:
                     commit_action = CallAction()
                     commit_cost = board_cont_cost
-                
+
                 else: #can only check
                     commit_action = CheckAction()
                     commit_cost = 0
-                
+
+
+
                 if board_cont_cost > 0: #opponent raised
 
-                    if board_cont_cost > 5: #raised by more than 5, parameter to tweak
-                        _INTIMIDATION = 0.15
-                        strength = max([0, strength - _INTIMIDATION])
-                    
+                    #intimidated_threshold_lp = 5
+                    if board_cont_cost > self.intimidated_threshold_lp*pot_total: #raised by more than 5, parameter to tweak
+                        #intimidation_factor_lp = 0.15
+
+                        strength = max([0, strength - self.intimidation_factor_lp])
+                        self.flag_intimidation=True
+
                     pot_odds = board_cont_cost / (pot_total + board_cont_cost)
 
                     if strength >= pot_odds: #positive expected value
                                                 #should at least call
 
-                        if strength > 0.5 and random.random() < strength:
-                            my_actions[i] = commit_action
+                        overstrength = strength - pot_odds #should change our behavior depending on overstrength
+
+                        #overstrength_threshold_lp = 0.05
+
+                        if overstrength > self.overstrength_threshold_lp and random.random() > 1 - strength:
+                            my_actions[i] = commit_action #raise basically
                             net_cost += commit_cost
-                        
+                            self.flag_overstrength=True
+
                         else:
                             my_actions[i] = CallAction()
                             net_cost += board_cont_cost
-                    
+
                     else: #negative EV
                         my_actions[i] = FoldAction()
                         net_cost += 0
-                
+
                 else: #board_cont_cost == 0
-                    if random.random() < strength:
+
+                    if self.aggressiveness_lp + strength > 1: #aggressiveness_lp defined earlier.
                         my_actions[i] = commit_action
                         net_cost += commit_cost
-                    
+                        self.flag_aggressive=True
+
                     else:
                         my_actions[i] = CheckAction()
                         net_cost += 0
 
 
-
-
-
-            # elif RaiseAction in legal_actions[i] and self.strong_hole:
-            #     min_raise, max_raise = round_state.board_states[i].raise_bounds(active, stacks)
-            #     max_cost = max_raise - my_pips[i]
-
-            #     if max_cost <= my_stack - net_cost:
-            #         my_actions[i] = RaiseAction(max_raise)
-            #         net_cost += max_cost
-                
-            #     elif CallAction in legal_actions[i]:
-            #         my_actions[i] = CallAction()
-            #         net_cost += continue_cost
-            #     else:
-            #         my_actions[i] = CheckAction()
-                
-            # elif CheckAction in legal_actions[i]:  # check-call
-            #     my_actions[i] = CheckAction()
-            # else:
-            #     my_actions[i] = CallAction()
         return my_actions
     
 
