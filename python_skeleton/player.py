@@ -327,11 +327,8 @@ class Player(Bot):
             my_cards = previous_board_state.hands[active]  # your cards
             opp_cards = previous_board_state.hands[1-active]  # opponent's cards or [] if not revealed
 
-        round_result=0
-        if my_delta>0:
-            round_result=1
-        elif my_delta<0:
-            round_result=-1
+        bound=1.0
+        round_result=min(max(my_delta,-bound),bound)
         self.ordering_strength[self.current_ordering]=(self.ordering_strength[self.current_ordering]*(self.ordering_number[self.current_ordering]-1)+round_result)/self.ordering_number[self.current_ordering]
 
         self.board_allocations = [[],[],[]]
