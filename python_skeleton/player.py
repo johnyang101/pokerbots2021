@@ -34,6 +34,15 @@ class Player(Bot):
         self.epsilon = .7
         self.gamma = .98
         self.current_ordering = 0
+
+        self.aggressiveness_lp = random.random()
+        self.initial_hole_lp = 1
+        self.decay_factor_lp = 1
+        self.intimidated_threshold_lp = 5
+        self.intimidation_factor_lp = 0.15
+        self.overstrength_threshold_lp = 0.05
+
+
     def rank_to_numeric(self, rank):
         if rank.isnumeric(): #2-9
             return int(rank)
@@ -305,6 +314,31 @@ class Player(Bot):
         #     hole = self.board_allocations[i]
         #     strength = self.calculate_strength(hole, self._MONTE_CARLO_ITERS)
         #     self.hole_strengths[i] = strength
+    
+    def update_lps(self, result, my_delta, initial_hole_lp, decay_factor_lp, intimidated_threshold_lp, intimidation_factor_lp, overstrength_threshold_lp, aggressiveness_lp):
+        if result == 1.0: #win
+            initial_hole_lp *= 1.01 + (my_delta * 0.001)
+            decay_factor_lp += 0.01 
+            #logic underneath is that if we won a lot more, we can afford to play more ballsy.
+            intimidated_threshold_lp *= 0.99 - (my_delta * 0.001)
+            intimidation_factor_lp *= 0.99 - (my_delta * 0.001)
+            overstrength_threshold_lp *= 0.99 - (my_delta * 0.001)
+            aggressiveness_lp *= 0.95 - (my_delta * 0.001)
+        elif result == -1.0: #loss
+            assert result == -1.0, 'Result not -1 for loss'
+            my_delta = abs(my_delta)
+
+            initial_hole_lp *= 0.99 - (my_delta * 0.001)
+            decay_factor_lp += 0.01 
+
+            #if we lost a lot more, we should play more conservatively.
+            intimidated_threshold_lp *= 1.01 + (my_delta * 0.001)
+            intimidation_factor_lp *= 1.01 + (my_delta * 0.001)
+            overstrength_threshold_lp *= 1.01 + (my_delta * 0.001)
+            aggressiveness_lp *= 1.05 + (my_delta * 0.001)
+
+        return initial_hole_lp, decay_factor_lp, intimidated_threshold_lp, intimidation_factor_lp, overstrength_threshold_lp, aggressiveness_lp
+        
 
     def handle_round_over(self, game_state, terminal_state, active):
         '''
@@ -329,7 +363,10 @@ class Player(Bot):
 
         bound=1.0
         round_result=min(max(my_delta,-bound),bound)
+        
         self.ordering_strength[self.current_ordering]=(self.ordering_strength[self.current_ordering]*(self.ordering_number[self.current_ordering]-1)+round_result)/self.ordering_number[self.current_ordering]
+        
+        self.initial_hole_lp, self.decay_factor_lp, self.intimidated_threshold_lp, self.intimidation_factor_lp, self.overstrength_threshold_lp, self.aggressiveness_lp = self.update_lps(round_result, my_delta, self.initial_hole_lp, self.decay_factor_lp, self.intimidated_threshold_lp, self.intimidation_factor_lp, self.overstrength_threshold_lp, self.aggressiveness_lp)
 
         self.board_allocations = [[],[],[]]
         self.hole_strengths = [0, 0, 0]
@@ -368,11 +405,11 @@ class Player(Bot):
         net_cost = 0 # keep track of the net additional amount you are spending across boards this round
         my_actions = [None] * NUM_BOARDS
         for i in range(NUM_BOARDS):
-            if AssignAction in legal_actions[i]:
+            if AssignAction in legal_actions[i]: #allocate cards
                 cards = [my_cards[2*i], my_cards[2*i+1]]
                 my_actions[i] = AssignAction(cards)
 
-            elif isinstance(round_state.board_states[i], TerminalState):
+            elif isinstance(round_state.board_states[i], TerminalState): #round over so check?
                 my_actions[i] = CheckAction()
 
             else: #do we add more resources
@@ -384,9 +421,39 @@ class Player(Bot):
                 strength = self.hole_strengths[i]
 
                 if street < 3: #means pre-flop
-                    raise_amount = int(my_pips[i] + board_cont_cost + 0.4 * (pot_total + board_cont_cost)) #0.4 is a parameter to tweak
-                else:
-                    raise_amount = int(my_pips[i] + board_cont_cost + 0.75 * (pot_total + board_cont_cost))
+                    if my_pips[i] == 1:
+                        BIG_BLIND = False
+                    elif my_pips[i] == 2 and opp_pips[i] == 1:
+                        BIG_BLIND = True
+                    
+                    '''
+                    Initial raise amount should depend on strength of hole, an arbitrary learning parameter, and a randomness factor that decays over time.
+
+                    My implementation does this; however, may not be ideal.
+                    '''
+                    
+                    # initial_hole_lp = 1 #initial learning parameter
+                    # decay_factor_lp = 1 #arbitarily increases by 0.1 lets say for each round. in the denominator of random_factor
+                    random_factor = random.random()
+                    doggo = round(my_pips[i] + board_cont_cost + strength * self.initial_hole_lp * (pot_total + board_cont_cost) + min(12, round((random_factor * (i + 1))/self.decay_factor_lp)))
+                    print(doggo)
+                    print('initial hole lp ' + str(self.initial_hole_lp)) 
+                    raise_amount = int(round(my_pips[i] + board_cont_cost + strength * self.initial_hole_lp * (pot_total + board_cont_cost) + round((random_factor * (i + 1))/self.decay_factor_lp))) #randomness factor depending on randomness, size of board, and decay
+
+                else: #not pre-flop
+                    # need to code smth to figure out strength given hole AND community cards.
+                    # rn just using hole strength
+
+
+                    # initial_hole_lp = 1 #initial learning parameter
+                    # decay_factor_lp = 1 #arbitarily increases by 0.1 lets say for each round. in the denominator of random_factor
+                    random_factor = random.random()
+                    doggo = round(my_pips[i] + board_cont_cost + strength * self.initial_hole_lp * (pot_total + board_cont_cost) + min(12, round((random_factor * (i + 1))/self.decay_factor_lp)))
+                    print(doggo)
+                    print('initial hole lp ' + str(self.initial_hole_lp)) 
+
+                    raise_amount = int(round(my_pips[i] + board_cont_cost + strength * self.initial_hole_lp * (pot_total + board_cont_cost) + round((random_factor * (i + 1))/self.decay_factor_lp))) #randomness factor depending on randomness, size of board, and decay
+
                 
                 #makes sure raise amount in bounds
                 raise_amount = max([min_raise, raise_amount])
@@ -395,9 +462,12 @@ class Player(Bot):
                 raise_cost = raise_amount - my_pips[i]
 
                 #need to be allowed to raise and afford it
-                if RaiseAction in legal_actions[i] and (raise_cost <= my_stack - net_cost):
+                if RaiseAction in legal_actions[i]:
                     commit_action = RaiseAction(raise_amount)
-                    commit_cost = raise_cost
+                    if (raise_cost <= my_stack - net_cost):
+                        commit_cost = raise_cost
+                    else:
+                        commit_cost = my_stack - net_cost
                 
                 elif CallAction in legal_actions[i]:
                     commit_action = CallAction()
@@ -407,19 +477,27 @@ class Player(Bot):
                     commit_action = CheckAction()
                     commit_cost = 0
                 
+                
+
                 if board_cont_cost > 0: #opponent raised
 
-                    if board_cont_cost > 5: #raised by more than 5, parameter to tweak
-                        _INTIMIDATION = 0.15
-                        strength = max([0, strength - _INTIMIDATION])
+                    #intimidated_threshold_lp = 5
+                    if board_cont_cost > self.intimidated_threshold_lp: #raised by more than 5, parameter to tweak
+                        #intimidation_factor_lp = 0.15
+                        
+                        strength = max([0, strength - self.intimidation_factor_lp])
                     
                     pot_odds = board_cont_cost / (pot_total + board_cont_cost)
 
                     if strength >= pot_odds: #positive expected value
                                                 #should at least call
 
-                        if strength > 0.5 and random.random() < strength:
-                            my_actions[i] = commit_action
+                        overstrength = strength - pot_odds #should change our behavior depending on overstrength
+                        
+                        #overstrength_threshold_lp = 0.05
+
+                        if overstrength > self.overstrength_threshold_lp and random.random() > 1 - strength:
+                            my_actions[i] = commit_action #raise basically
                             net_cost += commit_cost
                         
                         else:
@@ -431,7 +509,8 @@ class Player(Bot):
                         net_cost += 0
                 
                 else: #board_cont_cost == 0
-                    if random.random() < strength:
+                    
+                    if self.aggressiveness_lp + strength > 1: #aggressiveness_lp defined earlier.
                         my_actions[i] = commit_action
                         net_cost += commit_cost
                     
@@ -440,27 +519,6 @@ class Player(Bot):
                         net_cost += 0
 
 
-
-
-
-            # elif RaiseAction in legal_actions[i] and self.strong_hole:
-            #     min_raise, max_raise = round_state.board_states[i].raise_bounds(active, stacks)
-            #     max_cost = max_raise - my_pips[i]
-
-            #     if max_cost <= my_stack - net_cost:
-            #         my_actions[i] = RaiseAction(max_raise)
-            #         net_cost += max_cost
-                
-            #     elif CallAction in legal_actions[i]:
-            #         my_actions[i] = CallAction()
-            #         net_cost += continue_cost
-            #     else:
-            #         my_actions[i] = CheckAction()
-                
-            # elif CheckAction in legal_actions[i]:  # check-call
-            #     my_actions[i] = CheckAction()
-            # else:
-            #     my_actions[i] = CallAction()
         return my_actions
     
 
