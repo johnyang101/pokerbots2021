@@ -49,9 +49,9 @@ class Player(Bot):
         self.preflop_bluff_lower_bound=.4  
         self.preflop_bluff_upper_bound=.6
         self.preflop_value_reraise_lp=.1
-        self.postflop_value_bet_lp=.7 
+        self.postflop_value_bet_lp=.6 
         self.postflop_bluff_lower_bound=.4  
-        self.postflop_bluff_upper_bound=.5
+        self.postflop_bluff_upper_bound=.6
         self.postflop_value_reraise_lp=.1
         
 
@@ -130,7 +130,7 @@ class Player(Bot):
                 yield []
                 return 
             if len(cards) % 2 == 1:
-                for i in range(len(cards)):
+                for i in range(len(card)):
                     for result in pairs_helper(cards[:i] + cards[i+1:]):
                         yield result 
             else: 
@@ -257,7 +257,7 @@ class Player(Bot):
 
 
         assert len(holes_allocated) == 3, 'allocated more/less than 3 holes'
-        assert len(cards_remaining) == 0, 'we didnt allocate enough'
+        #assert len(cards_remaining) == 0, 'we didnt allocate enough'
         '''
         assert len(holes_allocated) == 3, 'allocated more/less than 3 holes'
         return holes_allocated

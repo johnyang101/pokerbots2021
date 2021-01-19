@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "player.py", line 583, in <module>
+    run_bot(Player(), parse_args())
+  File "/Users/johnyang/Desktop/pokerbots/lecture_1/pokerbots2021/python_skeleton_copy/skeleton/runner.py", line 179, in run_bot
+    runner.run()
+  File "/Users/johnyang/Desktop/pokerbots/lecture_1/pokerbots2021/python_skeleton_copy/skeleton/runner.py", line 88, in run
+    self.pokerbot.handle_round_over(game_state, round_state, active)
+  File "player.py", line 447, in handle_round_over
+    my_cards = previous_board_state.hands[active]  # your cards
+TypeError: 'NoneType' object is not subscriptable

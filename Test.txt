@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "player.py", line 737, in <module>
+    run_bot(Player(), parse_args())
+  File "player.py", line 47, in __init__
+    self.BIG_BLIND=TRUE
+NameError: name 'TRUE' is not defined
