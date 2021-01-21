@@ -36,7 +36,7 @@ class Player(Bot):
         '''
         self.board_allocations = [[],[],[]] #keep track of allocation of hole cards at round start
         self.hole_strengths = [0, 0, 0]
-        self.MONTE_CARLO_ITERS = 175
+        self.MONTE_CARLO_ITERS = 1500
         self.ordering_strength = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         self.ordering_number = [0, 0, 0, 0, 0, 0]
         self.epsilon = .7
@@ -48,15 +48,12 @@ class Player(Bot):
         self.preflop_value_bet_lp=.6 
         self.preflop_bluff_lower_bound=.4  
         self.preflop_bluff_upper_bound=.6
-        self.preflop_value_reraise_lp=.1
+        self.preflop_value_reraise_lp=.5
+        
         self.postflop_value_bet_lp=.7 
         self.postflop_bluff_lower_bound=.4  
         self.postflop_bluff_upper_bound=.5
-        self.postflop_value_reraise_lp=.1
-        
-
-        
-        
+        self.postflop_value_reraise_lp=.5
         
         self.aggressiveness_lp = random.random()
         self.initial_hole_lp = 0.1
@@ -72,6 +69,7 @@ class Player(Bot):
             '4Ts': 46.655, '79': 46.52, '68s': 46.4, '4J': 46.205, '6T': 46.105, '59s': 45.955, '3Ts': 45.81, '67s': 45.525, '78': 45.35, '3J': 45.3, '2Ts': 44.96, '58s': 44.82, '69': 44.59, '2J': 44.4, '5T': 44.375, '49s': 44.085, '57s': 44.005, '4T': 43.64, '39s': 43.475, '68': 43.395, '56s': 43.32, '48s': 42.98, '59': 42.895, '3T': 42.72, '29s': 42.63, '67': 42.455, '47s': 42.185, '2T': 41.81, '58': 41.725, '45s': 41.835,
              '46s': 41.53, '38s': 41.145, '49': 40.905, '57': 40.865, '28s': 40.565, '37s': 40.37, '39': 40.25, '56': 40.155, '35s': 40.065, '48': 39.75, '36s': 39.735, '29': 39.35, '34s': 39.03, '47': 38.905, '27s': 38.505, '45': 38.55, '25s': 38.235, '46': 38.225, '26s': 37.895, '38': 37.79, '28': 37.145, '24s': 37.235, '37': 36.96, '35': 36.65, '23s': 36.39, '36': 36.305, '34': 35.555, '27': 34.96, '25': 34.695, '26': 34.31, '24': 33.615, '23': 32.745}
 
+        
 
     def rank_to_numeric(self, rank):
         if rank.isnumeric(): #2-9
@@ -113,6 +111,7 @@ class Player(Bot):
             return rank_2 + rank_1 + suit_string
 
     def allocate_cards(self, my_cards):
+        '''
         ranks = {}
 
         for card in my_cards:
@@ -123,7 +122,7 @@ class Player(Bot):
                 ranks[card_rank].append(card)
             else:
                 ranks[card_rank] = [card]
-        
+        '''
         # credits stackoverflow lol https://stackoverflow.com/a/5360442 
         def pairs_helper(cards):
             if len(cards) < 2: 
@@ -163,10 +162,10 @@ class Player(Bot):
                 best_hands = hand 
                 best_hands_key = hand_key
 
-        merged_hands = tuple(zip(best_hands, best_hands_key))
-        merged_hands = sorted(merged_hands, key = lambda i: i[1])
-        best_hands_final = [tup[0] for tup in merged_hands]       
-        
+        #merged_hands = tuple(zip(best_hands, best_hands_key))
+        #merged_hands = sorted(merged_hands, key = lambda i: i[1])
+        #best_hands_final = [tup[0] for tup in merged_hands]       
+        best_hands_final=best_hands
         holes_allocated = best_hands_final
         '''    
         pairs = []
@@ -431,8 +430,7 @@ class Player(Bot):
         for i in range(NUM_BOARDS):
             self.board_allocations[i] = hole_and_strengths[i][0]
             self.hole_strengths[i] = hole_and_strengths[i][1]
-
-
+        
 
 
     def handle_new_round(self, game_state, round_state, active):
@@ -556,6 +554,7 @@ class Player(Bot):
         net_cost = 0 # keep track of the net additional amount you are spending across boards this round
         my_actions = [None] * NUM_BOARDS
         
+        
 
         def raise_amount_bounder(raise_amount):
             raise_amount = max([min_raise, raise_amount])
@@ -589,7 +588,7 @@ class Player(Bot):
 
         for i in range(NUM_BOARDS):
             if AssignAction in legal_actions[i]: #allocate cards
-                cards = [my_cards[2*i], my_cards[2*i+1]]
+                cards = self.board_allocations[i]
                 my_actions[i] = AssignAction(cards)
 
             elif isinstance(round_state.board_states[i], TerminalState): #round over so check?

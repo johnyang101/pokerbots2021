@@ -446,6 +446,8 @@ class Player(Bot):
             previous_board_state = terminal_board_state.previous_state
             my_cards = previous_board_state.hands[active]  # your cards
             opp_cards = previous_board_state.hands[1-active]  # opponent's cards or [] if not revealed
+        
+        
 
         bound=1.0
         round_result=min(max(my_delta,-bound),bound)
@@ -490,7 +492,7 @@ class Player(Bot):
         net_upper_raise_bound = round_state.raise_bounds()[1] # max raise across 3 boards
         net_cost = 0 # keep track of the net additional amount you are spending across boards this round
         my_actions = [None] * NUM_BOARDS
-
+        print(round_state.hands)
 
 
         for i in range(NUM_BOARDS):
