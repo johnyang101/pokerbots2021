@@ -43,10 +43,6 @@ class Player(Bot):
         self.gamma = .98
         self.current_ordering = 0
 
-        self.NUM_STRATS = 3
-        self.strat_number = 0
-        self.strat_number_wins_plays = [(0,0), (0,0), (0,0)]
-
         self.BIG_BLIND=True
 
         self.preflop_value_bet_lp=.6 
@@ -122,7 +118,18 @@ class Player(Bot):
             return rank_2 + rank_1 + suit_string
 
     def allocate_cards(self, my_cards):
-        
+        '''
+        ranks = {}
+
+        for card in my_cards:
+            card_rank = card[0] # string of numbers 2-9, T for 10, J, Q, K, A
+            card_suit = card[1] # d, h, s, c
+
+            if card_rank in ranks: #appends card to ranks dictionary
+                ranks[card_rank].append(card)
+            else:
+                ranks[card_rank] = [card]
+        '''
         # credits stackoverflow lol https://stackoverflow.com/a/5360442 
         def pairs_helper(cards):
             if len(cards) < 2: 
@@ -158,7 +165,6 @@ class Player(Bot):
             #hand_key = [self.hole_list_to_key(h) for h in hand]
             hand_score = sum(map(lambda i : i*i*i, hand_key))
             if hand_score > hands_max_score: 
-                print(best_hands)
                 hands_max_score = hand_score
                 best_hands = hand 
                 best_hands_key = hand_key
@@ -168,7 +174,97 @@ class Player(Bot):
         #best_hands_final = [tup[0] for tup in merged_hands]       
         best_hands_final=best_hands
         holes_allocated = best_hands_final
+        '''    
+        pairs = []
+        singles = []
 
+        for rank in ranks:
+            cards = ranks[rank]
+
+            if len(cards) == 1: #only single
+                singles.append(cards[0])
+            
+            elif len(cards) == 2 or len(cards) == 4: # pairs or 4 of a kind
+                pairs += cards
+            
+            else: #len(cards) == 3
+                pairs.append(cards[0])
+                pairs.append(cards[1])
+                singles.append(cards[2])
+
+        
+        cards_remaining = set(my_cards)
+        allocated_cards = set() #cards committed
+        holes_allocated = [] #holes made already
+
+        _MIN_PAIR_VALUE = 5 #we only want pairs stronger than this value
+
+        for i in range(len(pairs)//2):
+            pair = [pairs[2*i], pairs[2*i+1]] #get pair
+            pair_rank = pair[0][0]
+
+            if self.rank_to_numeric(pair_rank) >= _MIN_PAIR_VALUE:
+                holes_allocated.append(pair)
+                allocated_cards.update(pair)
+            
+        cards_remaining = cards_remaining - allocated_cards #update what cards we have remaining
+
+        sorted_remaining = self.sort_cards_by_rank(list(cards_remaining))
+
+        for i in range(len(sorted_remaining) - 1):
+            card_1 = sorted_remaining[i]
+            card_2 = sorted_remaining[i + 1]
+
+            rank_diff = self.rank_to_numeric(card_1[0]) - self.rank_to_numeric(card_2[0])
+
+            if (rank_diff <= 1) and (card_1 not in allocated_cards) and (card_2 not in allocated_cards):
+                hole = [card_1, card_2]
+                holes_allocated.append(hole)
+                allocated_cards.update(hole)
+            
+        cards_remaining = cards_remaining - allocated_cards
+
+        suits = {} #dictionary that maps suits to cards remaining
+        for card in cards_remaining:
+            card_suit = card[1]
+
+            if card_suit in suits:
+                suits[card_suit].append(card)
+            else:
+                suits[card_suit] = [card]
+                
+        for suit in suits:
+            cards = suits[suit]
+
+            if len(cards) == 2 or len(cards) == 3:
+                hole = [cards[0], cards[1]]
+                holes_allocated.append(hole)
+                allocated_cards.update(hole)
+            
+            elif len(cards) == 4: 
+                hole_1 = [cards[0], cards[1]]
+                hole_2 = [cards[2], cards[3]]
+
+                holes_allocated.append(hole_1)
+                allocated_cards.update(hole_1)
+
+                holes_allocated.append(hole_2)
+                allocated_cards.update(hole_2)
+    
+        cards_remaining = cards_remaining - allocated_cards
+        extra_cards = list(cards_remaining)
+
+        for i in range(len(extra_cards) // 2):
+            hole = [extra_cards[2*i], extra_cards[2*i +1]]
+            holes_allocated.append(hole)
+            allocated_cards.update(hole)
+
+        cards_remaining = cards_remaining - allocated_cards
+
+
+        assert len(holes_allocated) == 3, 'allocated more/less than 3 holes'
+        assert len(cards_remaining) == 0, 'we didnt allocate enough'
+        '''
         assert len(holes_allocated) == 3, 'allocated more/less than 3 holes'
         return holes_allocated
 
@@ -186,6 +282,46 @@ class Player(Bot):
 
     def calculate_strength(self, hole, iters):
         return self.starting_strengths[self.hole_list_to_key(hole)]/100
+
+        '''
+        deck = eval7.Deck()
+        hole_cards = [eval7.Card(card) for card in hole]
+
+        for card in hole_cards:
+            deck.cards.remove(card)
+        
+        score = 0
+
+        for _ in range(iters):
+            deck.shuffle()
+
+            _COMM = 5
+            _OPP = 2
+
+            draw = deck.peek(_COMM + _OPP)
+
+            opp_hole = draw[: _OPP]
+            community = draw[_OPP: ]
+
+            our_hand = hole_cards + community
+            opp_hand = opp_hole + community
+
+            our_hand_value = eval7.evaluate(our_hand) #eval7 values doesnt have any meaning, only relative rankings.
+            opp_hand_value = eval7.evaluate(opp_hand)
+
+            if our_hand_value > opp_hand_value: #we win
+                score += 2
+            
+            elif our_hand_value == opp_hand_value: #we tie
+                score += 1
+            
+            else: #we lost
+                score += 0
+        
+        hand_strength = score / (2 * iters)
+
+        return hand_strength
+        '''
 
     def calculate_strength_postflop(self, hole, iters, community, street):
 
@@ -245,7 +381,7 @@ class Player(Bot):
         hole_and_strengths = sorted(holes_and_strengths, key = lambda x: x[1])
         rand=1
         opt_index=-1
-        if random.random()>self.epsilon: #sometimes use ordering strengths and find optimal index.
+        if random.random()>self.epsilon:
             max_strength=-1
             for k in range (6):
                 if self.ordering_strength[k]>max_strength:
@@ -253,7 +389,6 @@ class Player(Bot):
                     opt_index=k
         else:
             rand=random.random()
-
         if rand<.16666 or opt_index==0:
             self.current_ordering=0
         elif rand<.33333 or opt_index==1:
@@ -287,11 +422,8 @@ class Player(Bot):
             temp = hole_and_strengths[2]
             hole_and_strengths[2] = hole_and_strengths[0]
             hole_and_strengths[0] = temp
-
         self.ordering_number[self.current_ordering] += 1
         self.epsilon*=self.gamma
-
-
         #if random.random() < 0.15: #swap strongest hole card with second
         #    temp = hole_and_strengths[2]
         #    hole_and_strengths[2] = hole_and_strengths[1]
@@ -306,88 +438,28 @@ class Player(Bot):
             self.board_allocations[i] = hole_and_strengths[i][0]
             self.hole_strengths[i] = hole_and_strengths[i][1]
         
-    def strategic_assign_holes(self, strat_number, hole_cards):
-        
 
-        #0 is default, 1 is focus on hole 3, 2 is focus on 1 and 2
-
-        if strat_number == 0:
-            return self.assign_holes(hole_cards)
-        
-        holes_and_strengths = []
-
-        for hole in hole_cards:
-            key = self.hole_list_to_key(hole)
-            strength = self.starting_strengths[key]/100
-            # strength = self.calculate_strength(hole, self.MONTE_CARLO_ITERS)
-            holes_and_strengths.append((hole, strength))
-
-        hole_and_strengths = sorted(holes_and_strengths, key = lambda x: x[1])
-
-        if strat_number == 1: #maps strongest card to hole 3
+    '''
+        def choose_lps(self, possibilities):
+            probabilities=[]
+            total=sum(possibilities)
+            for i in range(len(possibilities)):
+                if total == 0:
+                    probabilities.append(0)
+                else:
+                    probabilities.append(possibilities[i]/total)
+            for i in range(len(probabilities)-1):
+                probabilities[i+1]+=probabilities[i]
+            rand=random.random()
+            for i in range(len(probabilities)):
+                if probabilities[i]>rand:
+                    return i
+            return len(probabilities)-1
             
-            for i in range(NUM_BOARDS):
-                j = NUM_BOARDS - i - 1
-                self.board_allocations[i] = hole_and_strengths[j][0]
-                self.hole_strengths[i] = hole_and_strengths[j][1]
-        
-        if strat_number == 2: #maps strongest cards to hole 1 and 2
-
-            self.board_allocations[1] = hole_and_strengths[0][0]
-            self.hole_strengths[1] = hole_and_strengths[0][1]
-
-            self.board_allocations[0] = hole_and_strengths[1][0]
-            self.hole_strengths[0] = hole_and_strengths[1][1]
-
-            self.board_allocations[2] = hole_and_strengths[2][0]
-            self.hole_strengths[2] = hole_and_strengths[2][1]
-
-    def update_strats(self, my_delta):
-        if my_delta > 0: #updates strat_number_wins_plays
-            self.strat_number_wins_plays[self.strat_number] = (self.strat_number_wins_plays[self.strat_number][0] + 1, self.strat_number_wins_plays[self.strat_number][1] + 1)
-        else:
-            self.strat_number_wins_plays[self.strat_number] = (self.strat_number_wins_plays[self.strat_number][0], self.strat_number_wins_plays[self.strat_number][1] + 1)
-
-         #chooses best strat number based on win percentage with a randomness factor.
-        max = -1
-        best_strat_number = 0
-        for i in range(self.NUM_STRATS):
-            if self.strat_number_wins_plays[i][1] != 0:
-                if self.strat_number_wins_plays[i][0]/self.strat_number_wins_plays[i][1] > max:
-                    max = self.strat_number_wins_plays[i][0]/self.strat_number_wins_plays[i][1]
-                    best_strat_number = i
-
-        rand = random.random()
-        strat_list = []
-        for i in range(self.NUM_STRATS):
-            strat_list.append(i)
-
-        if rand < 0.333:
-            best_strat_number = strat_list[best_strat_number - 1]
-        
-        self.strat_number = best_strat_number
-
-    
-    def choose_lps(self, possibilities):
-        probabilities=[]
-        total=sum(possibilities)
-        for i in range(len(possibilities)):
-            if total == 0:
-                probabilities.append(0)
-            else:
-                probabilities.append(possibilities[i]/total)
-        for i in range(len(probabilities)-1):
-            probabilities[i+1]+=probabilities[i]
-        rand=random.random()
-        for i in range(len(probabilities)):
-            if probabilities[i]>rand:
-                return i
-        return len(probabilities)-1
-        
-    def change_probabilities_lp(self,change,lp_index,chosen_index):
-        self.lp_totals[lp_index][chosen_index]+=change
-        self.lp_totals[lp_index][chosen_index]=max(self.lp_totals[lp_index][chosen_index],0)
-
+        def change_probabilities_lp(self,change,lp_index,chosen_index):
+            self.lp_totals[lp_index][chosen_index]+=change
+            self.lp_totals[lp_index][chosen_index]=max(self.lp_totals[lp_index][chosen_index],0)
+    '''
 
     def handle_new_round(self, game_state, round_state, active):
         '''
@@ -409,9 +481,9 @@ class Player(Bot):
         big_blind = bool(active)  # True if you are the big blind
         
         allocated_holes = self.allocate_cards(my_cards)
-        self.strategic_assign_holes(self.strat_number, allocated_holes)
+        self.assign_holes(allocated_holes)
         
-        for i in range(8):
+        '''for i in range(8):
             self.indexes[i]=self.choose_lps(self.lp_totals[i])
         self.preflop_value_bet_lp=self.lp_options[0][self.indexes[0]] 
         self.preflop_bluff_lower_bound=self.lp_options[1][self.indexes[1]]  
@@ -422,9 +494,42 @@ class Player(Bot):
         self.postflop_bluff_lower_bound=self.lp_options[5][self.indexes[5]]  
         self.postflop_bluff_upper_bound=self.lp_options[6][self.indexes[6]]
         self.postflop_value_reraise_lp=self.lp_options[7][self.indexes[7]]
+        '''
 
 
-   
+        # lec 2 strat
+        # self.allocate_cards(my_cards)
+
+        # for i in range(NUM_BOARDS):
+        #     hole = self.board_allocations[i]
+        #     strength = self.calculate_strength(hole, self._MONTE_CARLO_ITERS)
+        #     self.hole_strengths[i] = strength
+    
+    
+        
+    # def update_lps(self, result, my_delta):
+    #     if result == 1.0: #win
+    #         self.initial_hole_lp *= 1.01 + (my_delta * 0.001)
+    #         self.decay_factor_lp += 0.05
+    #         #logic underneath is that if we won a lot more, we can afford to play more ballsy.
+    #         self.intimidated_threshold_lp *= 0.99 - (my_delta * 0.001)
+    #         self.intimidation_factor_lp *= 0.99 - (my_delta * 0.001)
+    #         self.overstrength_threshold_lp *= 0.99 - (my_delta * 0.001)
+    #         self.aggressiveness_lp *= 0.95 - (my_delta * 0.001)
+    #     elif result == -1.0: #loss
+    #         assert result == -1.0, 'Result not -1 for loss'
+    #         my_delta = abs(my_delta)
+
+    #         self.initial_hole_lp *= 0.99 - (my_delta * 0.001)
+    #         self.decay_factor_lp += 0.05 
+
+    #         #if we lost a lot more, we should play more conservatively.
+    #         self.intimidated_threshold_lp * 1.01 + (my_delta * 0.001)
+    #         self.intimidation_factor_lp *= 1.01 + (my_delta * 0.001)
+    #         self.overstrength_threshold_lp *= 1.01 + (my_delta * 0.001)
+    #         self.aggressiveness_lp *= 1.05 + (my_delta * 0.001)
+
+    #     return
         
 
     def handle_round_over(self, game_state, terminal_state, active):
@@ -457,12 +562,9 @@ class Player(Bot):
 
         self.board_allocations = [[],[],[]]
         self.hole_strengths = [0, 0, 0]
-        for i in range(8):
+        '''for i in range(8):
             self.change_probabilities_lp(min(max(my_delta,-self.bound),self.bound),i,self.indexes[i])
-
-        self.update_strats(round_result) #updates win percentages and strat number to run.
-
-        print(self.strat_number_wins_plays)
+        '''
 
         game_clock = game_state.game_clock
         round_num = game_state.round_num
@@ -531,8 +633,6 @@ class Player(Bot):
 
 
         for i in range(NUM_BOARDS):
-            i = NUM_BOARDS - i - 1 # can change the order we bet in. want to bet on strongest hand first.
-
             if AssignAction in legal_actions[i]: #allocate cards
                 cards = self.board_allocations[i]
                 my_actions[i] = AssignAction(cards)
@@ -641,6 +741,45 @@ class Player(Bot):
                     net_cost += commit_cost
                 #else dont update commit_cost
                 
+                
+                '''
+                if board_cont_cost > 0: #opponent raised
+
+                    #intimidated_threshold_lp = 5
+                    if board_cont_cost > self.intimidated_threshold_lp: #raised by more than 5, parameter to tweak
+                        #intimidation_factor_lp = 0.15
+                        
+                        strength = max([0, strength - self.intimidation_factor_lp])
+
+                    if strength >= pot_odds: #positive expected value
+                                                #should at least call
+
+                        overstrength = strength - pot_odds #should change our behavior depending on overstrength
+                        
+                        #overstrength_threshold_lp = 0.05
+
+                        if overstrength > self.overstrength_threshold_lp and random.random() > 1 - strength:
+                            my_actions[i] = commit_action #raise basically
+                            net_cost += commit_cost
+                        
+                        else:
+                            my_actions[i] = CallAction()
+                            net_cost += board_cont_cost
+                    
+                    else: #negative EV
+                        my_actions[i] = FoldAction()
+                        net_cost += 0
+                
+                else: #board_cont_cost == 0
+                    
+                    if self.aggressiveness_lp + strength > 1: #aggressiveness_lp defined earlier.
+                        my_actions[i] = commit_action
+                        net_cost += commit_cost
+                    
+                    else:
+                        my_actions[i] = CheckAction()
+                        net_cost += 0
+'''
 
         return my_actions
     
