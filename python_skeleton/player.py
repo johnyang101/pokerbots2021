@@ -474,9 +474,9 @@ class Player(Bot):
 
         self.board_allocations = [[],[],[]]
         self.hole_strengths = [0, 0, 0]
-        for i in range(8):
+        '''for i in range(8):
             self.change_probabilities_lp(min(max(my_delta,0),self.bound),i,self.indexes[i])
-
+'''
         self.update_strats(round_result2) #updates win percentages and strat number to run.
 
         print(self.strat_number_wins_plays)
