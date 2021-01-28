@@ -381,7 +381,6 @@ class Player(Bot):
     
 
     def choose_lps(self, possibilities):
-        return
         if random.random()<self.epsilon:
             return floor(random.random()*len(possibilities))
 
@@ -401,7 +400,6 @@ class Player(Bot):
         return len(probabilities)-1
         
     def change_probabilities_lp(self,change,lp_index,chosen_index):
-        return
         self.lp_totals[lp_index][chosen_index][0]*=self.lp_totals[lp_index][chosen_index][1]
         self.lp_totals[lp_index][chosen_index][1]+=1
         self.lp_totals[lp_index][chosen_index][0]+=change
@@ -430,7 +428,7 @@ class Player(Bot):
         
         allocated_holes = self.allocate_cards(my_cards)
         self.strategic_assign_holes(self.strat_number, allocated_holes)
-        '''       
+              
         for i in range(8):
             self.indexes[i]=self.choose_lps(self.lp_totals[i][:][0])
         self.preflop_value_bet_lp=self.lp_options[0][self.indexes[0]] 
@@ -442,7 +440,7 @@ class Player(Bot):
         self.postflop_bluff_lower_bound=self.lp_options[5][self.indexes[5]]  
         self.postflop_bluff_upper_bound=self.lp_options[6][self.indexes[6]]
         self.postflop_value_reraise_lp=self.lp_options[7][self.indexes[7]]
-        '''
+    
 
     def handle_round_over(self, game_state, terminal_state, active):
         '''
@@ -475,9 +473,9 @@ class Player(Bot):
 
         self.board_allocations = [[],[],[]]
         self.hole_strengths = [0, 0, 0]
-        '''for i in range(8):
+        for i in range(8):
             self.change_probabilities_lp(min(max(my_delta,0),self.bound),i,self.indexes[i])
-        '''
+        
         self.update_strats(round_result2) #updates win percentages and strat number to run.
 
         print(self.strat_number_wins_plays)
