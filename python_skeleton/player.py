@@ -350,8 +350,6 @@ class Player(Bot):
 
     def update_strats(self, my_delta):
 
-        return
-
         if self.strat_number == 10 or self.already_won:
             self.strat_number = 10
             return
