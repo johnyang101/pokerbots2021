@@ -370,9 +370,8 @@ class Player(Bot):
 
         rand = random.random()
         strat_list = []
-        for i in range(self.NUM_STRATS):a
-            if i != 10:
-                strat_list.append(i)
+        for i in range(self.NUM_STRATS):
+            strat_list.append(i)
 
         if rand < 0.333:
             best_strat_number = strat_list[best_strat_number - 1]
