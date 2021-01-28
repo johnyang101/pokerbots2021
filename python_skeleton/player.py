@@ -378,31 +378,32 @@ class Player(Bot):
         
         self.strat_number = best_strat_number
     
-    def choose_lps(self, possibilities):
-        if random.random()<self.epsilon:
-            return floor(random.random()*len(possibilities))
 
-        probabilities=[]
-        total=sum(possibilities)
-        for i in range(len(possibilities)):
-            if total == 0:
-                probabilities.append(0)
-            else:
-                probabilities.append(possibilities[i]/total)
-        for i in range(len(probabilities)-1):
-            probabilities[i+1]+=probabilities[i]
-        rand=random.random()
-        for i in range(len(probabilities)):
-            if probabilities[i]>rand:
-                return i
-        return len(probabilities)-1
-        '  
-    def change_probabilities_lp(self,change,lp_index,chosen_index):
-        self.lp_totals[lp_index][chosen_index][0]*=self.lp_totals[lp_index][chosen_index][1]
-        self.lp_totals[lp_index][chosen_index][1]+=1
-        self.lp_totals[lp_index][chosen_index][0]+=change
-        self.lp_totals[lp_index][chosen_index][0]/=self.lp_totals[lp_index][chosen_index][1]
-        self.lp_totals[lp_index][chosen_index][0]=max(self.lp_totals[lp_index][chosen_index],0)
+#    def choose_lps(self, possibilities):
+#         if random.random()<self.epsilon:
+#             return floor(random.random()*len(possibilities))
+
+#         probabilities=[]
+#         total=sum(possibilities)
+#         for i in range(len(possibilities)):
+#             if total == 0:
+#                 probabilities.append(0)
+#             else:
+#                 probabilities.append(possibilities[i]/total)
+#         for i in range(len(probabilities)-1):
+#             probabilities[i+1]+=probabilities[i]
+#         rand=random.random()
+#         for i in range(len(probabilities)):
+#             if probabilities[i]>rand:
+#                 return i
+#         return len(probabilities)-1
+        
+#     def change_probabilities_lp(self,change,lp_index,chosen_index):
+#         self.lp_totals[lp_index][chosen_index][0]*=self.lp_totals[lp_index][chosen_index][1]
+#         self.lp_totals[lp_index][chosen_index][1]+=1
+#         self.lp_totals[lp_index][chosen_index][0]+=change
+#         self.lp_totals[lp_index][chosen_index][0]/=self.lp_totals[lp_index][chosen_index][1]
+#         self.lp_totals[lp_index][chosen_index][0]=max(self.lp_totals[lp_index][chosen_index],0)
 
         
     def handle_new_round(self, game_state, round_state, active):
