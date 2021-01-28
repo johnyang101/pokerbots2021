@@ -27,7 +27,7 @@ def test_bot(iterations):
 
 if __name__ == "__main__":
 
-    print(test_bot(1))
+    print(test_bot(10))
 
         
 

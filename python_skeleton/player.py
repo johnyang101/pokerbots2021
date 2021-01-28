@@ -43,9 +43,10 @@ class Player(Bot):
         self.gamma = .98
         self.current_ordering = 0
 
+        #1 normal, 2, strongest hole cards to third hole, 3 strongest hole cards to 1 and 2, 10 to check_fold
         self.NUM_STRATS = 3
         self.strat_number = 0
-        self.strat_number_wins_plays = [(0,0), (0,0), (0,0)]
+        self.strat_number_wins_plays = [(0, 0) for i in range(self.NUM_STRATS)]
 
         self.BIG_BLIND=True
 
@@ -63,9 +64,10 @@ class Player(Bot):
         self.lp_totals=self.lp_options[:]
         for i in range(len(self.lp_totals)):
             for j in range(len(self.lp_totals[i])):
-                self.lp_totals[i][j]=self.bound*7
+                self.lp_totals[i][j]=[.1,0]
         self.indexes=[3,3,3,3,3,3,3,3]
         
+        self.already_won=False
         self.aggressiveness_lp = random.random()
         self.initial_hole_lp = 0.1
         self.decay_factor_lp = 1
@@ -246,11 +248,14 @@ class Player(Bot):
         rand=1
         opt_index=-1
         if random.random()>self.epsilon: #sometimes use ordering strengths and find optimal index.
-            max_strength=-1
-            for k in range (6):
-                if self.ordering_strength[k]>max_strength:
-                    max_strength=self.ordering_strength[k]
-                    opt_index=k
+            rand=random.random()
+            temp_strengths=self.ordering_strength/sum(self.ordering_strength)
+            for i in range(len(temp_strengths-1)):
+                temp_strengths[i+1]+=temp_strengths[i]
+            for i in range(len(temp_strengths)):
+                if temp_strengths[i]>rand:
+                    opt_index=i
+                    break
         else:
             rand=random.random()
 
@@ -274,7 +279,7 @@ class Player(Bot):
             temp = hole_and_strengths[2]
             hole_and_strengths[2] = hole_and_strengths[0]
             hole_and_strengths[0] = temp
-        elif rand<.6666 or opt_index==4:
+        elif rand<.8333 or opt_index==4:
             self.current_ordering=3
             temp = hole_and_strengths[2]
             hole_and_strengths[2] = hole_and_strengths[1]
@@ -307,10 +312,8 @@ class Player(Bot):
             self.hole_strengths[i] = hole_and_strengths[i][1]
         
     def strategic_assign_holes(self, strat_number, hole_cards):
-        
 
         #0 is default, 1 is focus on hole 3, 2 is focus on 1 and 2
-
         if strat_number == 0:
             return self.assign_holes(hole_cards)
         
@@ -343,6 +346,14 @@ class Player(Bot):
             self.hole_strengths[2] = hole_and_strengths[2][1]
 
     def update_strats(self, my_delta):
+
+        return
+
+        if self.strat_number == 10 or self.already_won:
+            self.strat_number = 10
+            return
+        
+        
         if my_delta > 0: #updates strat_number_wins_plays
             self.strat_number_wins_plays[self.strat_number] = (self.strat_number_wins_plays[self.strat_number][0] + 1, self.strat_number_wins_plays[self.strat_number][1] + 1)
         else:
@@ -351,7 +362,7 @@ class Player(Bot):
          #chooses best strat number based on win percentage with a randomness factor.
         max = -1
         best_strat_number = 0
-        for i in range(self.NUM_STRATS):
+        for i in range(self.NUM_STRATS): #choose best strat off of greatest win percentage
             if self.strat_number_wins_plays[i][1] != 0:
                 if self.strat_number_wins_plays[i][0]/self.strat_number_wins_plays[i][1] > max:
                     max = self.strat_number_wins_plays[i][0]/self.strat_number_wins_plays[i][1]
@@ -359,16 +370,19 @@ class Player(Bot):
 
         rand = random.random()
         strat_list = []
-        for i in range(self.NUM_STRATS):
-            strat_list.append(i)
+        for i in range(self.NUM_STRATS):a
+            if i != 10:
+                strat_list.append(i)
 
         if rand < 0.333:
             best_strat_number = strat_list[best_strat_number - 1]
         
         self.strat_number = best_strat_number
-
     
     def choose_lps(self, possibilities):
+        if random.random()<self.epsilon:
+            return floor(random.random()*len(possibilities))
+
         probabilities=[]
         total=sum(possibilities)
         for i in range(len(possibilities)):
@@ -383,12 +397,15 @@ class Player(Bot):
             if probabilities[i]>rand:
                 return i
         return len(probabilities)-1
-        
+        '  
     def change_probabilities_lp(self,change,lp_index,chosen_index):
-        self.lp_totals[lp_index][chosen_index]+=change
-        self.lp_totals[lp_index][chosen_index]=max(self.lp_totals[lp_index][chosen_index],0)
+        self.lp_totals[lp_index][chosen_index][0]*=self.lp_totals[lp_index][chosen_index][1]
+        self.lp_totals[lp_index][chosen_index][1]+=1
+        self.lp_totals[lp_index][chosen_index][0]+=change
+        self.lp_totals[lp_index][chosen_index][0]/=self.lp_totals[lp_index][chosen_index][1]
+        self.lp_totals[lp_index][chosen_index][0]=max(self.lp_totals[lp_index][chosen_index],0)
 
-
+        
     def handle_new_round(self, game_state, round_state, active):
         '''
         Called when a new round starts. Called NUM_ROUNDS times.
@@ -410,9 +427,9 @@ class Player(Bot):
         
         allocated_holes = self.allocate_cards(my_cards)
         self.strategic_assign_holes(self.strat_number, allocated_holes)
-        
+        '''       
         for i in range(8):
-            self.indexes[i]=self.choose_lps(self.lp_totals[i])
+            self.indexes[i]=self.choose_lps(self.lp_totals[i][:][0])
         self.preflop_value_bet_lp=self.lp_options[0][self.indexes[0]] 
         self.preflop_bluff_lower_bound=self.lp_options[1][self.indexes[1]]  
         self.preflop_bluff_upper_bound=self.lp_options[2][self.indexes[2]]
@@ -422,10 +439,7 @@ class Player(Bot):
         self.postflop_bluff_lower_bound=self.lp_options[5][self.indexes[5]]  
         self.postflop_bluff_upper_bound=self.lp_options[6][self.indexes[6]]
         self.postflop_value_reraise_lp=self.lp_options[7][self.indexes[7]]
-
-
-   
-        
+        '''
 
     def handle_round_over(self, game_state, terminal_state, active):
         '''
@@ -450,17 +464,18 @@ class Player(Bot):
 
         bound=1.0
         round_result=min(max(my_delta,-bound),bound)
+        round_result2=min(max(my_delta,0),self.bound)
         
-        self.ordering_strength[self.current_ordering]=(self.ordering_strength[self.current_ordering]*(self.ordering_number[self.current_ordering]-1)+round_result)/self.ordering_number[self.current_ordering]
+        self.ordering_strength[self.current_ordering]=(self.ordering_strength[self.current_ordering]*(self.ordering_number[self.current_ordering]-1)+round_result2)/self.ordering_number[self.current_ordering]
         
-        # self.update_lps(round_result, my_delta)
+        #self.update_lps(round_result2, my_delta)
 
         self.board_allocations = [[],[],[]]
         self.hole_strengths = [0, 0, 0]
         for i in range(8):
-            self.change_probabilities_lp(min(max(my_delta,-self.bound),self.bound),i,self.indexes[i])
+            self.change_probabilities_lp(min(max(my_delta,0),self.bound),i,self.indexes[i])
 
-        self.update_strats(round_result) #updates win percentages and strat number to run.
+        self.update_strats(round_result2) #updates win percentages and strat number to run.
 
         print(self.strat_number_wins_plays)
 
@@ -498,7 +513,8 @@ class Player(Bot):
         net_cost = 0 # keep track of the net additional amount you are spending across boards this round
         my_actions = [None] * NUM_BOARDS
         
-        
+        if my_stack-opp_stack>21*(NUM_ROUNDS-game_state.round_num+1)+3:
+            self.already_won=True
 
         def raise_amount_bounder(raise_amount):
             raise_amount = max([min_raise, raise_amount])
@@ -548,97 +564,106 @@ class Player(Bot):
                 min_raise, max_raise = round_state.board_states[i].raise_bounds(active, round_state.stacks) #active variable is which player we are
                 pot_odds = board_cont_cost / (pot_total + board_cont_cost)
 
-                if street < 3: #means pre-flop
-                    if my_pips[i] == 1:
-                        self.BIG_BLIND = False
-                    elif my_pips[i] == 2 and opp_pips[i] == 1:
-                        self.BIG_BLIND = True
+
+                if self.strat_number == 10:
+                    commit_action, commit_cost = action_tree(-1)
                     
-                    strength = self.hole_strengths[i]
-                    if not self.BIG_BLIND and my_pips[i]==1:  
-                        #based on the strength and lps, we bet 5/3rds of the pot total preflop on small blind.
-                        if strength>self.preflop_value_bet_lp or (strength>self.preflop_bluff_lower_bound and strength<self.preflop_bluff_upper_bound and pot_total<200): #small-blind raise for value or bluff
-                            raise_amount = int(round(strength * 4 + ((0.5 - random.random()) * 2))) #int(round(1.6666*(pot_total)+my_pips[i])) 
-                            #fixed raise amount
-                            commit_action, commit_cost = action_tree(raise_amount)
+                    my_actions[i] = commit_action
+                    if commit_cost >= 0:
+                        net_cost += commit_cost
+                        
+                else:
+                    if street < 3: #means pre-flop
+                        if my_pips[i] == 1:
+                            self.BIG_BLIND = False
+                        elif my_pips[i] == 2 and opp_pips[i] == 1:
+                            self.BIG_BLIND = True
+                        
+                        strength = self.hole_strengths[i]
+                        if not self.BIG_BLIND and my_pips[i]==1:  
+                            #based on the strength and lps, we bet 5/3rds of the pot total preflop on small blind.
+                            if strength>self.preflop_value_bet_lp or (strength>self.preflop_bluff_lower_bound and strength<self.preflop_bluff_upper_bound and pot_total<200): #small-blind raise for value or bluff
+                                raise_amount = int(round(strength * 4 + ((0.5 - random.random()) * 2))) #int(round(1.6666*(pot_total)+my_pips[i])) 
+                                #fixed raise amount
+                                commit_action, commit_cost = action_tree(raise_amount)
 
-                        else: 
-                            commit_action, commit_cost = action_tree(0) #call
+                            else: 
+                                commit_action, commit_cost = action_tree(0) #call
 
-                    elif board_cont_cost==0: #we're big blind and small blind called.
-                        if strength>self.preflop_value_bet_lp or (strength>self.preflop_bluff_lower_bound and strength<self.preflop_bluff_upper_bound and pot_total<200):
-                            raise_amount= int(round(strength * 4 + ((0.5 - random.random()) * 2)))#int(round(1.5*(pot_total)+my_pips[i]))
-                            commit_action, commit_cost = action_tree(raise_amount)
-                        else:
-                            commit_action, commit_cost = action_tree(-1)
-                    else:
-                        if strength> 0.79: #because if they raise us, they have good cards.
-                            raise_amount= int(round(opp_pips[i]+pot_total*.666666))
-                            commit_action, commit_cost = action_tree(raise_amount)
-                        elif strength > (pot_odds + (random.random() * 0.5)):
-                            if pot_total > 100:
-                                if strength > 0.79:
-                                    commit_action, commit_cost = action_tree(0)
-                                else:
-                                    commit_action, commit_cost = action_tree(-2)
-                            elif pot_total > 50:
-                                if strength > 0.65:
-                                    commit_action, commit_cost = action_tree(0)
-                                else:
-                                    commit_action, commit_cost = action_tree(-2)
+                        elif board_cont_cost==0: #we're big blind and small blind called.
+                            if strength>self.preflop_value_bet_lp or (strength>self.preflop_bluff_lower_bound and strength<self.preflop_bluff_upper_bound and pot_total<200):
+                                raise_amount= int(round(strength * 4 + ((0.5 - random.random()) * 2)))#int(round(1.5*(pot_total)+my_pips[i]))
+                                commit_action, commit_cost = action_tree(raise_amount)
                             else:
-                                commit_action, commit_cost = action_tree(0) #call/check
+                                commit_action, commit_cost = action_tree(-1)
                         else:
-                            commit_action, commit_cost = action_tree(-2)
+                            if strength> 0.79: #because if they raise us, they have good cards.
+                                raise_amount= int(round(opp_pips[i]+pot_total*.666666))
+                                commit_action, commit_cost = action_tree(raise_amount)
+                            elif strength > (pot_odds + (random.random() * 0.5)):
+                                if pot_total > 100:
+                                    if strength > 0.79:
+                                        commit_action, commit_cost = action_tree(0)
+                                    else:
+                                        commit_action, commit_cost = action_tree(-2)
+                                elif pot_total > 50:
+                                    if strength > 0.65:
+                                        commit_action, commit_cost = action_tree(0)
+                                    else:
+                                        commit_action, commit_cost = action_tree(-2)
+                                else:
+                                    commit_action, commit_cost = action_tree(0) #call/check
+                            else:
+                                commit_action, commit_cost = action_tree(-2)
 
-                else: #not pre-flop
+                    else: #not pre-flop
 
-                    strength = self.calculate_strength_postflop(self.board_allocations[i], self.MONTE_CARLO_ITERS, board_cards[i], street)
-                    if continue_cost==0 and not self.BIG_BLIND:
-                        if strength > self.postflop_value_bet_lp:
-                            raise_amount = int(round(pot_total*1.2))
-                            commit_action, commit_cost = action_tree(raise_amount)
-                        elif (strength>self.postflop_bluff_lower_bound and strength<self.postflop_bluff_upper_bound and pot_total<100):
-                            raise_amount = int(round(pot_total * strength / 2 + my_pips[i]))
-                            commit_action, commit_cost = action_tree(raise_amount)
-                        else:
-                            commit_action, commit_cost = action_tree(-1) #checking
-                    elif not self.BIG_BLIND:
-                        if strength > 0.6 + 0.1*i and pot_total < 200:
-                            raise_amount= int(round(opp_pips[i]+pot_total*.666666))
-                            commit_action, commit_cost = action_tree(raise_amount)
+                        strength = self.calculate_strength_postflop(self.board_allocations[i], self.MONTE_CARLO_ITERS, board_cards[i], street)
+                        if continue_cost==0 and not self.BIG_BLIND:
+                            if strength > self.postflop_value_bet_lp:
+                                raise_amount = int(round(pot_total*1.2))
+                                commit_action, commit_cost = action_tree(raise_amount)
+                            elif (strength>self.postflop_bluff_lower_bound and strength<self.postflop_bluff_upper_bound and pot_total<100):
+                                raise_amount = int(round(pot_total * strength / 2 + my_pips[i]))
+                                commit_action, commit_cost = action_tree(raise_amount)
+                            else:
+                                commit_action, commit_cost = action_tree(-1) #checking
+                        elif not self.BIG_BLIND:
+                            if strength > 0.6 + 0.1*i and pot_total < 200:
+                                raise_amount= int(round(opp_pips[i]+pot_total*.666666))
+                                commit_action, commit_cost = action_tree(raise_amount)
 
-                        elif strength>pot_odds + 0.3:
-                            commit_action, commit_cost = action_tree(0) #calling
-                        else:
-                            commit_action, commit_cost = action_tree(-2) #folding
-                    elif continue_cost==0: #big blind, we go first and nothing's happened
+                            elif strength>pot_odds + 0.3:
+                                commit_action, commit_cost = action_tree(0) #calling
+                            else:
+                                commit_action, commit_cost = action_tree(-2) #folding
+                        elif continue_cost==0: #big blind, we go first and nothing's happened
 
-                        if strength>self.postflop_value_bet_lp:
-                            raise_amount=int(round(pot_total*1.2))
-                            commit_action, commit_cost = action_tree(raise_amount)
-                        elif (strength>self.postflop_bluff_lower_bound and strength<self.postflop_bluff_upper_bound and pot_total<200):
-                            raise_amount = int(round(pot_total * strength / 2 + my_pips[i]))
-                            commit_action, commit_cost = action_tree(raise_amount)
+                            if strength>self.postflop_value_bet_lp:
+                                raise_amount=int(round(pot_total*1.2))
+                                commit_action, commit_cost = action_tree(raise_amount)
+                            elif (strength>self.postflop_bluff_lower_bound and strength<self.postflop_bluff_upper_bound and pot_total<200):
+                                raise_amount = int(round(pot_total * strength / 2 + my_pips[i]))
+                                commit_action, commit_cost = action_tree(raise_amount)
+                            else:
+                                commit_action, commit_cost = action_tree(-1) #checking
                         else:
-                            commit_action, commit_cost = action_tree(-1) #checking
-                    else:
-                        if strength> 0.6 + pot_odds:
-                            raise_amount= int(round(min(0.15 * (my_stack - net_cost), pot_total * 1.1)))
-                            commit_action, commit_cost = action_tree(raise_amount)
-                        elif strength>pot_odds + 0.3:
-                            commit_action, commit_cost = action_tree(0) #calling
-                        else:
-                            commit_action, commit_cost = action_tree(-2) #folding
+                            if strength> 0.6 + pot_odds:
+                                raise_amount= int(round(min(0.15 * (my_stack - net_cost), pot_total * 1.1)))
+                                commit_action, commit_cost = action_tree(raise_amount)
+                            elif strength>pot_odds + 0.3:
+                                commit_action, commit_cost = action_tree(0) #calling
+                            else:
+                                commit_action, commit_cost = action_tree(-2) #folding
 
 
                     #random_factor = random.random()
 
                     #raise_amount = int(round(my_pips[i] + board_cont_cost + (strength + self.initial_hole_lp) * (pot_total + board_cont_cost) + min(12, round((random_factor * (i + 1))/self.decay_factor_lp)))) #randomness factor depending on randomness, size of board, and decay
                 
-                my_actions[i] = commit_action
-                if commit_cost >= 0:
-                    net_cost += commit_cost
+                    my_actions[i] = commit_action
+                    if commit_cost >= 0:
+                        net_cost += commit_cost
                 #else dont update commit_cost
                 
 
