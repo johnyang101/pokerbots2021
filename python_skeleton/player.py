@@ -252,7 +252,7 @@ class Player(Bot):
             temp_strengths=self.ordering_strength[:]
             for i in range(len(temp_strengths)):
                 temp_strengths[i]/=sum(self.ordering_strength) 
-            for i in range(len(temp_strengths-1)):
+            for i in range(len(temp_strengths)-1):
                 temp_strengths[i+1]+=temp_strengths[i]
             for i in range(len(temp_strengths)):
                 if temp_strengths[i]>rand:
