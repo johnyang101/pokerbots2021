@@ -382,7 +382,7 @@ class Player(Bot):
 
     def choose_lps(self, possibilities):
         if random.random()<self.epsilon:
-            return floor(random.random()*len(possibilities))
+            return math.floor(random.random()*len(possibilities))
 
         probabilities=[]
         total=sum(possibilities)
