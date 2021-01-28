@@ -249,7 +249,9 @@ class Player(Bot):
         opt_index=-1
         if random.random()>self.epsilon: #sometimes use ordering strengths and find optimal index.
             rand=random.random()
-            temp_strengths=self.ordering_strength/sum(self.ordering_strength)
+            temp_strengths=self.ordering_strength[:]
+            for i in range(len(temp_strengths)):
+                temp_strengths[i]/=sum(self.ordering_strength) 
             for i in range(len(temp_strengths-1)):
                 temp_strengths[i+1]+=temp_strengths[i]
             for i in range(len(temp_strengths)):
@@ -476,7 +478,7 @@ class Player(Bot):
         self.hole_strengths = [0, 0, 0]
         '''for i in range(8):
             self.change_probabilities_lp(min(max(my_delta,0),self.bound),i,self.indexes[i])
-'''
+        '''
         self.update_strats(round_result2) #updates win percentages and strat number to run.
 
         print(self.strat_number_wins_plays)
