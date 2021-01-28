@@ -250,8 +250,9 @@ class Player(Bot):
         if random.random()>self.epsilon: #sometimes use ordering strengths and find optimal index.
             rand=random.random()
             temp_strengths=self.ordering_strength[:]
+            sum_strengths=max(1,sum(self.ordering_strength))
             for i in range(len(temp_strengths)):
-                temp_strengths[i]/=sum(self.ordering_strength) 
+                temp_strengths[i]/=sum_strengths 
             for i in range(len(temp_strengths)-1):
                 temp_strengths[i+1]+=temp_strengths[i]
             for i in range(len(temp_strengths)):
